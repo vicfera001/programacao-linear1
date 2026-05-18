@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Escape Room: A Cantina da Programação Linear</title>
+  <style>
+    :root {
+      --bg: #0d1321;
+      --panel: #17243d;
+      --panel-2: #223354;
+      --card: rgba(255, 255, 255, 0.075);
+      --text: #f4f7fb;
+      --muted: #b7c3d6;
+      --accent: #7ee2b8;
+      --accent-2: #ffd166;
+      --danger: #ff6b6b;
+      --ok: #82f0b7;
+      --focus: #ffffff;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(126, 226, 184, 0.22), transparent 32rem),
+        radial-gradient(circle at bottom right, rgba(255, 209, 102, 0.18), transparent 26rem),
+        var(--bg);
+    }
+
+    body.high-contrast {
+      --bg: #000000;
+      --panel: #0d0d0d;
+      --panel-2: #1b1b1b;
+      --card: rgba(255, 255, 255, 0.13);
+      --text: #ffffff;
+      --muted: #eeeeee;
+      --accent: #00ff99;
+      --accent-2: #ffff00;
+      --danger: #ff4040;
+      --focus: #ffff00;
+    }
+
+    header {
+      padding: 28px clamp(18px, 4vw, 48px) 18px;
+      display: grid;
+      gap: 10px;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 4.2rem);
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .subtitle {
+      max-width: 940px;
+      color: var(--muted);
+      font-size: 1.08rem;
+      line-height: 1.55;
+    }
+
+    .top-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .layout {
+      width: min(1220px, calc(100% - 28px));
+      margin: 0 auto 36px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 18px;
+      align-items: start;
+    }
+
+    .room, .side-panel, .modal-card, .intro-card, .teacher-card {
+      background: linear-gradient(145deg, rgba(23, 36, 61, 0.96), rgba(13, 19, 33, 0.98));
+      border: 1px solid rgba(255, 255, 255, 0.13);
+      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+    }
+
+    .intro-card {
+      width: min(1220px, calc(100% - 28px));
+      margin: 0 auto 18px;
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 16px;
+    }
+
+    .intro-card ul, .teacher-card ul { margin-bottom: 0; padding-left: 20px; color: var(--muted); line-height: 1.55; }
+
+    .teacher-card {
+      width: min(1220px, calc(100% - 28px));
+      margin: 18px auto 40px;
+      padding: 18px;
+    }
+
+    .rubric-table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 12px;
+      margin-top: 12px;
+      font-size: 0.95rem;
+    }
+
+    .rubric-table th, .rubric-table td {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      padding: 10px;
+      vertical-align: top;
+    }
+
+    .rubric-table th { background: rgba(255, 255, 255, 0.10); }
+
+    .room {
+      min-height: 680px;
+      padding: 22px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .room::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+      background-size: 36px 36px;
+      opacity: 0.36;
+      pointer-events: none;
+    }
+
+    .room-stage {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      grid-template-rows: repeat(8, minmax(58px, 1fr));
+      gap: 12px;
+      min-height: 640px;
+    }
+
+    .object {
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(34, 51, 84, 0.88);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+      min-height: 116px;
+      color: var(--text);
+      text-align: left;
+    }
+
+    .object:hover, .object:focus-visible {
+      transform: translateY(-3px);
+      border-color: var(--accent);
+      background: rgba(46, 71, 113, 0.96);
+      outline: 3px solid transparent;
+    }
+
+    button:focus-visible, input:focus-visible, textarea:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .object.locked { filter: grayscale(0.5); opacity: 0.72; }
+    .object.solved { border-color: rgba(126, 226, 184, 0.88); }
+    .object .emoji { font-size: 2.15rem; }
+    .object strong { font-size: 1.05rem; }
+    .object small { color: var(--muted); line-height: 1.35; }
+
+    .board { grid-column: 1 / 6; grid-row: 1 / 4; }
+    .locker { grid-column: 6 / 9; grid-row: 1 / 3; }
+    .cabinet { grid-column: 9 / 13; grid-row: 1 / 4; }
+    .graph { grid-column: 1 / 5; grid-row: 4 / 7; }
+    .safe { grid-column: 5 / 9; grid-row: 3 / 6; }
+    .door { grid-column: 9 / 13; grid-row: 4 / 8; }
+    .desk { grid-column: 1 / 6; grid-row: 7 / 9; }
+    .projector { grid-column: 6 / 9; grid-row: 6 / 9; }
+    .hint-box { grid-column: 9 / 13; grid-row: 8 / 9; min-height: 90px; }
+
+    .door {
+      background:
+        linear-gradient(90deg, rgba(0, 0, 0, 0.22), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.28)),
+        linear-gradient(145deg, #5b3a25, #9b6338);
+    }
+
+    .side-panel {
+      padding: 18px;
+      display: grid;
+      align-content: start;
+      gap: 16px;
+      position: sticky;
+      top: 12px;
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .stat, .inventory, .lesson, .log, .record-box {
+      background: var(--card);
+      border-radius: 14px;
+      padding: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.09);
+    }
+
+    .stat b { color: var(--accent-2); display: block; font-size: 1.25rem; }
+    .inventory-list { display: grid; gap: 8px; }
+
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.16);
+      color: var(--muted);
+    }
+
+    .item.collected {
+      color: var(--text);
+      background: rgba(126, 226, 184, 0.15);
+      border: 1px solid rgba(126, 226, 184, 0.28);
+    }
+
+    .lesson ul { padding-left: 20px; margin-bottom: 0; color: var(--muted); line-height: 1.5; }
+    .log { min-height: 92px; color: var(--muted); line-height: 1.45; }
+    .log b { color: var(--accent); }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-weight: 700;
+      cursor: pointer;
+      color: #102034;
+      background: var(--accent);
+      transition: transform 140ms ease, opacity 140ms ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button.secondary { background: rgba(255, 255, 255, 0.15); color: var(--text); }
+    button.warning { background: var(--accent-2); }
+    button:disabled { cursor: not-allowed; opacity: 0.55; transform: none; }
+
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(5, 10, 18, 0.76);
+      padding: 16px;
+      z-index: 10;
+    }
+
+    .modal.open { display: grid; }
+
+    .modal-card {
+      width: min(780px, 100%);
+      max-height: 90vh;
+      overflow: auto;
+      padding: 22px;
+    }
+
+    .puzzle-options {
+      display: grid;
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .option {
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      padding: 12px;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text);
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .option:hover, .option.selected {
+      border-color: var(--accent-2);
+      background: rgba(255, 209, 102, 0.16);
+    }
+
+    .feedback { min-height: 30px; font-weight: 700; line-height: 1.5; }
+    .feedback.good { color: var(--ok); }
+    .feedback.bad { color: var(--danger); }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 18px;
+    }
+
+    .formula {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 8px;
+      background: rgba(126, 226, 184, 0.15);
+      color: var(--accent);
+      font-family: Consolas, monospace;
+    }
+
+    .input-grid {
+      display: grid;
+      gap: 10px;
+      margin: 14px 0;
+    }
+
+    .input-row {
+      display: grid;
+      grid-template-columns: 1fr 130px;
+      gap: 10px;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    input, textarea {
+      width: 100%;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.22);
+      color: var(--text);
+      padding: 10px;
+      font: inherit;
+    }
+
+    textarea { min-height: 86px; resize: vertical; }
+
+    .graph-wrap {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 14px;
+      padding: 12px;
+      margin: 14px 0;
+    }
+
+    .graph-wrap svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: rgba(0, 0, 0, 0.16);
+      border-radius: 12px;
+    }
+
+    .certificate {
+      border: 2px dashed var(--accent-2);
+      border-radius: 16px;
+      padding: 18px;
+      background: rgba(255, 209, 102, 0.11);
+      text-align: center;
+    }
+
+    .reflection-list {
+      text-align: left;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    @media print {
+      body {
+        background: white;
+        color: black;
+      }
+      .layout, header .top-actions, .modal, .teacher-card button, .side-panel button { display: none !important; }
+      header, .intro-card, .teacher-card {
+        box-shadow: none;
+        border: 1px solid #000;
+        color: #000;
+        background: white;
+        width: 100%;
+      }
+      .rubric-table th, .rubric-table td { border: 1px solid #000; }
+      .subtitle, .intro-card ul, .teacher-card ul { color: #000; }
+    }
+
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .side-panel { position: static; }
+      .intro-card { grid-template-columns: 1fr; }
+      .room-stage { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+      .object { grid-column: auto !important; grid-row: auto !important; }
+    }
+
+    @media (max-width: 580px) {
+      .room-stage { grid-template-columns: 1fr; }
+      .status { grid-template-columns: 1fr; }
+      .input-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>🔐 Escape Room: A Cantina da Programação Linear</h1>
+    <p class="subtitle">A cantina escolar precisa decidir quantos sanduíches naturais e quantos sucos produzir para maximizar o lucro, respeitando limites de pão, frutas e tempo de preparo. A turma deverá modelar o problema, representar a região viável e justificar a solução ótima.</p>
+    <div class="top-actions">
+      <button type="button" id="startButton">Começar missão</button>
+      <button type="button" class="secondary" id="contrastButton">Modo alto contraste</button>
+      <button type="button" class="secondary" onclick="window.print()">Imprimir orientações e rubrica</button>
+    </div>
+  </header>
+
+  <section class="intro-card" id="intro">
+    <div>
+      <h2>🎯 Objetivos da aula</h2>
+      <ul>
+        <li>Definir variáveis de decisão em uma situação contextualizada.</li>
+        <li>Escrever restrições lineares a partir de recursos limitados.</li>
+        <li>Montar e interpretar uma função objetivo.</li>
+        <li>Comparar vértices da região viável para justificar uma solução ótima.</li>
+      </ul>
+    </div>
+    <div>
+      <h2>⏱️ Organização sugerida</h2>
+      <ul>
+        <li>Tempo: 25 a 35 minutos.</li>
+        <li>Grupos de até 4 estudantes.</li>
+        <li>Entrega: registro no caderno ou no Google Sala de Aula.</li>
+        <li>Produto final: justificativa da melhor decisão da cantina.</li>
+      </ul>
+    </div>
+  </section>
+
+  <main class="layout" id="gameArea">
+    <section class="room" aria-label="Sala do escape room">
+      <div class="room-stage" id="roomStage"></div>
+    </section>
+
+    <aside class="side-panel" aria-label="Painel do jogador">
+      <section class="status">
+        <div class="stat"><span>Progresso</span><b id="progress">0/5</b></div>
+        <div class="stat"><span>Pontuação</span><b id="score">0</b></div>
+      </section>
+
+      <section class="inventory">
+        <h2>🎒 Inventário</h2>
+        <div class="inventory-list" id="inventoryList"></div>
+      </section>
+
+      <section class="record-box">
+        <h2>🧾 Registro do grupo</h2>
+        <p class="subtitle">Use este espaço para copiar o resumo ao final ou orientar o registro no caderno.</p>
+        <textarea id="studentRecord" aria-label="Registro do grupo" placeholder="Ex.: x = sanduíches, y = sucos; restrições encontradas; vértices testados; solução ótima..."></textarea>
+      </section>
+
+      <section class="lesson">
+        <h2>💡 Ideias-chave</h2>
+        <ul>
+          <li><strong>Variáveis:</strong> escolhas que o grupo pode controlar.</li>
+          <li><strong>Restrições:</strong> limites de recursos, tempo ou orçamento.</li>
+          <li><strong>Função objetivo:</strong> lucro que se deseja maximizar.</li>
+          <li><strong>Ótimo:</strong> em programação linear, deve ser comparado nos vértices viáveis.</li>
+        </ul>
+      </section>
+
+      <section class="log" aria-live="polite" id="messageLog">
+        <b>Missão:</b> clique nos objetos da sala e resolva os desafios em sequência.
+      </section>
+
+      <button class="secondary" type="button" id="resetButton">Reiniciar jogo</button>
+    </aside>
+  </main>
+
+  <section class="teacher-card">
+    <h2>📋 Rubrica de avaliação sugerida — 10 pontos</h2>
+    <table class="rubric-table">
+      <thead>
+        <tr>
+          <th>Critério</th>
+          <th>2,5 pontos</th>
+          <th>1,5 ponto</th>
+          <th>0,5 ponto</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Modelagem matemática</td>
+          <td>Define corretamente variáveis e restrições.</td>
+          <td>Define parcialmente variáveis ou restrições.</td>
+          <td>Apresenta definições confusas ou incompletas.</td>
+        </tr>
+        <tr>
+          <td>Cálculos e vértices</td>
+          <td>Calcula corretamente os lucros nos vértices viáveis.</td>
+          <td>Calcula com pequenos erros, mas mantém o raciocínio.</td>
+          <td>Testa poucos pontos ou não compara adequadamente.</td>
+        </tr>
+        <tr>
+          <td>Justificativa da solução ótima</td>
+          <td>Explica por que a solução escolhida maximiza o lucro e respeita as restrições.</td>
+          <td>Indica a resposta correta, mas justifica pouco.</td>
+          <td>Apresenta resposta sem justificativa matemática clara.</td>
+        </tr>
+        <tr>
+          <td>Colaboração e registro</td>
+          <td>Grupo participa, registra etapas e comunica a solução com clareza.</td>
+          <td>Participação irregular ou registro parcialmente organizado.</td>
+          <td>Pouca participação ou registro insuficiente.</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-card">
+      <h2 id="modalTitle"></h2>
+      <div id="modalBody"></div>
+      <div class="feedback" id="feedback"></div>
+      <div class="actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <script>
+    const items = [
+      { id: 'variaveis', name: 'Cartão das Variáveis', icon: '🧩' },
+      { id: 'restricoes', name: 'Cartão das Restrições', icon: '📋' },
+      { id: 'objetivo', name: 'Lente da Função Objetivo', icon: '🔎' },
+      { id: 'vertice', name: 'Marcador dos Vértices', icon: '📍' },
+      { id: 'chave', name: 'Chave Final', icon: '🗝️' }
+    ];
+
+    const game = {
+      score: 0,
+      selected: null,
+      solved: new Set(),
+      inventory: new Set()
+    };
+
+    const wrongFeedback = {
+      priceVariable: 'Cuidado: preço não é a decisão central neste problema. A cantina precisa decidir quantas unidades produzir.',
+      totalVariable: 'Lucro e tempo são grandezas importantes, mas não são as variáveis de decisão x e y.',
+      inequalityGreater: 'Observe a palavra “máximo”. Quando há recurso disponível limitado, a desigualdade correta usa ≤.',
+      impossibleExpression: 'Essa expressão mistura os termos sem representar o consumo total de pão dos dois produtos.',
+      minimize: 'O problema pede maior lucro possível, portanto a função objetivo deve ser maximizada.',
+      nonlinear: 'Em programação linear, a função objetivo precisa ser linear. O produto xy torna a expressão não linear.',
+      center: 'O centro pode até estar dentro da região viável, mas o melhor valor de uma função linear costuma aparecer em um vértice.',
+      outside: 'Pontos fora da região violam pelo menos uma restrição, portanto não podem ser solução.',
+      calculations: 'Revise as substituições em L = 5x + 8y. Calcule cada ponto com calma antes de verificar.'
+    };
+
+    const rooms = [
+      {
+        id: 'board',
+        className: 'board',
+        icon: '🧑‍🏫',
+        title: 'Quadro da Cantina',
+        description: 'O primeiro bilhete apresenta a decisão que a cantina precisa tomar.',
+        item: 'variaveis',
+        type: 'choice',
+        question: 'A cantina venderá sanduíches naturais e sucos. Qual alternativa define corretamente as variáveis de decisão?',
+        options: [
+          { text: 'x = preço do sanduíche e y = preço do suco.', feedback: wrongFeedback.priceVariable },
+          { text: 'x = quantidade de sanduíches e y = quantidade de sucos a produzir.', feedback: null },
+          { text: 'x = lucro total e y = tempo total disponível.', feedback: wrongFeedback.totalVariable }
+        ],
+        answer: 1,
+        success: 'Excelente! Variáveis de decisão indicam o que pode ser escolhido: quantos sanduíches e quantos sucos produzir.'
+      },
+      {
+        id: 'locker',
+        className: 'locker',
+        icon: '🧰',
+        title: 'Armário dos Recursos',
+        description: 'O cadeado pede a restrição correta para o uso de pão.',
+        requires: ['variaveis'],
+        item: 'restricoes',
+        type: 'choice',
+        question: 'Cada sanduíche usa 2 fatias de pão e cada suco vendido em combo usa 1 unidade de embalagem. Para simplificar, considere que há 60 unidades do recurso total. Se x é sanduíches e y é sucos, qual restrição representa esse limite?',
+        options: [
+          { text: '2x + y ≤ 60', feedback: null },
+          { text: '2x + y ≥ 60', feedback: wrongFeedback.inequalityGreater },
+          { text: '60x + y ≤ 2', feedback: wrongFeedback.impossibleExpression }
+        ],
+        answer: 0,
+        success: 'Muito bem! Como o recurso é limitado, a restrição correta é 2x + y ≤ 60.'
+      },
+      {
+        id: 'cabinet',
+        className: 'cabinet',
+        icon: '🧪',
+        title: 'Bancada dos Lucros',
+        description: 'Os frascos escondem a função objetivo da cantina.',
+        requires: ['restricoes'],
+        item: 'objetivo',
+        type: 'choice',
+        question: 'Se o lucro é R$ 5 por sanduíche e R$ 8 por suco, qual função objetivo deve ser usada?',
+        options: [
+          { text: 'Maximizar L = 5x + 8y', feedback: null },
+          { text: 'Minimizar L = 8x - 5y', feedback: wrongFeedback.minimize },
+          { text: 'Maximizar L = 13xy', feedback: wrongFeedback.nonlinear }
+        ],
+        answer: 0,
+        success: 'Perfeito! A função objetivo soma o lucro de cada tipo de produto: L = 5x + 8y.'
+      },
+      {
+        id: 'graph',
+        className: 'graph',
+        icon: '📊',
+        title: 'Mapa da Região Viável',
+        description: 'As retas no chão revelam os pontos candidatos à melhor solução.',
+        requires: ['objetivo'],
+        item: 'vertice',
+        type: 'choice',
+        extra: graphSvg(),
+        question: 'No método gráfico, onde devemos procurar primeiro o melhor valor de uma função objetivo linear?',
+        options: [
+          { text: 'Apenas no centro da região viável.', feedback: wrongFeedback.center },
+          { text: 'Nos vértices da região viável.', feedback: null },
+          { text: 'Em qualquer ponto fora das restrições.', feedback: wrongFeedback.outside }
+        ],
+        answer: 1,
+        success: 'Correto! Para uma função objetivo linear, a comparação dos vértices viáveis é uma estratégia essencial.'
+      },
+      {
+        id: 'safe',
+        className: 'safe',
+        icon: '🔒',
+        title: 'Cofre da Otimização',
+        description: 'O cofre só abre se o grupo calcular os lucros nos vértices.',
+        requires: ['vertice'],
+        item: 'chave',
+        type: 'calculation',
+        question: 'Considere os vértices viáveis A(0,0), B(30,0), C(20,20) e D(0,40). Calcule L = 5x + 8y em cada vértice e indique o ponto de maior lucro.',
+        fields: [
+          { id: 'A', label: 'L(A) para A(0,0)', value: 0 },
+          { id: 'B', label: 'L(B) para B(30,0)', value: 150 },
+          { id: 'C', label: 'L(C) para C(20,20)', value: 260 },
+          { id: 'D', label: 'L(D) para D(0,40)', value: 320 },
+          { id: 'best', label: 'Melhor vértice: escreva A, B, C ou D', value: 'D' }
+        ],
+        success: 'Cofre aberto! O maior lucro é L = 320 no vértice D(0,40). Esse ponto é viável e maximiza o lucro entre os vértices testados.'
+      },
+      {
+        id: 'door',
+        className: 'door',
+        icon: '🚪',
+        title: 'Porta de Saída',
+        description: 'A fechadura aceita apenas a chave final e uma justificativa.',
+        requires: ['chave'],
+        final: true
+      },
+      {
+        id: 'desk',
+        className: 'desk',
+        icon: '📝',
+        title: 'Mesa de Registro',
+        description: 'Uma folha orienta o registro no caderno.',
+        info: 'Registro esperado: variáveis de decisão, restrições, função objetivo, vértices testados, cálculo do lucro em cada vértice e justificativa da solução ótima.'
+      },
+      {
+        id: 'projector',
+        className: 'projector',
+        icon: '📽️',
+        title: 'Projetor de Dicas',
+        description: 'Mostra um roteiro para resolver problemas lineares.',
+        info: 'Roteiro: 1) defina as variáveis; 2) escreva as restrições; 3) monte a função objetivo; 4) represente a região viável; 5) calcule o valor da função nos vértices; 6) justifique a melhor solução.'
+      },
+      {
+        id: 'hint-box',
+        className: 'hint-box',
+        icon: '✨',
+        title: 'Caixa de Reflexão',
+        description: 'Pergunta extra para discussão com a turma.',
+        info: 'Discussão: uma produção com lucro alto pode ser rejeitada se violar restrições. Em matemática aplicada, uma boa solução precisa ser lucrativa e viável.'
+      }
+    ];
+
+    const roomStage = document.getElementById('roomStage');
+    const inventoryList = document.getElementById('inventoryList');
+    const progress = document.getElementById('progress');
+    const score = document.getElementById('score');
+    const messageLog = document.getElementById('messageLog');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const modalActions = document.getElementById('modalActions');
+    const feedback = document.getElementById('feedback');
+    const studentRecord = document.getElementById('studentRecord');
+
+    function graphSvg() {
+      return `
+        <div class="graph-wrap" aria-label="Gráfico com região viável, eixos, retas e vértices">
+          <svg viewBox="0 0 520 360" role="img" aria-labelledby="graphTitle graphDesc">
+            <title id="graphTitle">Região viável da cantina</title>
+            <desc id="graphDesc">Gráfico com eixos x e y, retas de restrição, região viável sombreada e vértices A, B, C e D.</desc>
+            <defs>
+              <pattern id="grid" width="26" height="26" patternUnits="userSpaceOnUse">
+                <path d="M 26 0 L 0 0 0 26" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1"/>
+              </pattern>
+            </defs>
+            <rect x="0" y="0" width="520" height="360" fill="url(#grid)" />
+            <line x1="70" y1="310" x2="480" y2="310" stroke="#f4f7fb" stroke-width="2"/>
+            <line x1="70" y1="310" x2="70" y2="40" stroke="#f4f7fb" stroke-width="2"/>
+            <text x="472" y="335" fill="#f4f7fb" font-size="16">x</text>
+            <text x="45" y="48" fill="#f4f7fb" font-size="16">y</text>
+            <polygon points="70,310 340,310 250,175 70,70" fill="rgba(255,209,102,0.35)" stroke="#ffd166" stroke-width="3"/>
+            <line x1="70" y1="70" x2="340" y2="310" stroke="#7ee2b8" stroke-width="3"/>
+            <text x="210" y="105" fill="#7ee2b8" font-size="14">2x + y = 60</text>
+            <line x1="70" y1="70" x2="430" y2="310" stroke="#9fc5ff" stroke-width="3"/>
+            <text x="315" y="250" fill="#9fc5ff" font-size="14">x + y = 40</text>
+            <circle cx="70" cy="310" r="6" fill="#ffffff"/><text x="80" y="303" fill="#ffffff" font-size="14">A(0,0)</text>
+            <circle cx="340" cy="310" r="6" fill="#ffffff"/><text x="350" y="303" fill="#ffffff" font-size="14">B(30,0)</text>
+            <circle cx="250" cy="175" r="6" fill="#ffffff"/><text x="260" y="170" fill="#ffffff" font-size="14">C(20,20)</text>
+            <circle cx="70" cy="70" r="6" fill="#ffffff"/><text x="82" y="66" fill="#ffffff" font-size="14">D(0,40)</text>
+            <text x="175" y="240" fill="#ffd166" font-size="18" font-weight="700">Região viável</text>
+          </svg>
+        </div>
+      `;
+    }
+
+    function renderRoom() {
+      roomStage.innerHTML = rooms.map(room => {
+        const solved = game.solved.has(room.id);
+        const locked = room.requires && !room.requires.every(item => game.inventory.has(item));
+        return `
+          <button class="object ${room.className} ${solved ? 'solved' : ''} ${locked ? 'locked' : ''}" type="button" data-room="${room.id}" aria-label="${room.title}. ${locked ? 'Bloqueado.' : room.description}">
+            <span class="emoji" aria-hidden="true">${room.icon}</span>
+            <strong>${room.title}</strong>
+            <small>${locked ? 'Bloqueado: colete mais itens.' : room.description}</small>
+          </button>
+        `;
+      }).join('');
+
+      document.querySelectorAll('[data-room]').forEach(button => {
+        button.addEventListener('click', () => openRoom(button.dataset.room));
+      });
+    }
+
+    function renderInventory() {
+      inventoryList.innerHTML = items.map(item => `
+        <div class="item ${game.inventory.has(item.id) ? 'collected' : ''}">
+          <span aria-hidden="true">${item.icon}</span><span>${item.name}</span>
+        </div>
+      `).join('');
+      progress.textContent = `${game.inventory.size}/${items.length}`;
+      score.textContent = game.score;
+    }
+
+    function setMessage(message) {
+      messageLog.innerHTML = message;
+    }
+
+    function openRoom(id) {
+      const room = rooms.find(entry => entry.id === id);
+      const locked = room.requires && !room.requires.every(item => game.inventory.has(item));
+
+      if (locked) {
+        const missing = room.requires.filter(item => !game.inventory.has(item)).map(itemId => items.find(item => item.id === itemId).name);
+        setMessage(`<b>Bloqueado:</b> procure por ${missing.join(', ')} antes de tentar ${room.title}.`);
+        return;
+      }
+
+      if (room.final) {
+        openFinalDoor();
+        return;
+      }
+
+      if (room.info) {
+        showInfo(room);
+        return;
+      }
+
+      if (game.solved.has(room.id)) {
+        setMessage(`<b>${room.title}:</b> enigma já resolvido. Continue explorando a sala.`);
+        return;
+      }
+
+      if (room.type === 'calculation') {
+        showCalculationPuzzle(room);
+      } else {
+        showChoicePuzzle(room);
+      }
+    }
+
+    function showChoicePuzzle(room) {
+      game.selected = null;
+      modalTitle.textContent = `${room.icon} ${room.title}`;
+      modalBody.innerHTML = `
+        <p>${room.description}</p>
+        ${room.extra || ''}
+        <p><strong>Desafio:</strong> ${room.question}</p>
+        <div class="puzzle-options">
+          ${room.options.map((option, index) => `<button class="option" type="button" data-option="${index}">${option.text}</button>`).join('')}
+        </div>
+      `;
+      feedback.textContent = '';
+      feedback.className = 'feedback';
+      modalActions.innerHTML = '<button class="secondary" type="button" data-hint>Ver dica</button><button class="secondary" type="button" data-close>Fechar</button><button type="button" data-check>Verificar</button>';
+      openModal();
+
+      modalBody.querySelectorAll('[data-option]').forEach(option => {
+        option.addEventListener('click', () => {
+          game.selected = Number(option.dataset.option);
+          modalBody.querySelectorAll('.option').forEach(entry => entry.classList.remove('selected'));
+          option.classList.add('selected');
+        });
+      });
+
+      modalActions.querySelector('[data-hint]').addEventListener('click', () => showHint(room));
+      modalActions.querySelector('[data-close]').addEventListener('click', closeModal);
+      modalActions.querySelector('[data-check]').addEventListener('click', () => checkChoiceAnswer(room));
+    }
+
+    function showCalculationPuzzle(room) {
+      modalTitle.textContent = `${room.icon} ${room.title}`;
+      modalBody.innerHTML = `
+        <p>${room.description}</p>
+        <p><strong>Desafio:</strong> ${room.question}</p>
+        <div class="input-grid">
+          ${room.fields.map(field => `
+            <label class="input-row">
+              <span>${field.label}</span>
+              <input id="field-${field.id}" type="text" inputmode="decimal" autocomplete="off" />
+            </label>
+          `).join('')}
+        </div>
+      `;
+      feedback.textContent = '';
+      feedback.className = 'feedback';
+      modalActions.innerHTML = '<button class="secondary" type="button" data-hint>Ver dica</button><button class="secondary" type="button" data-close>Fechar</button><button type="button" data-check>Verificar cálculos</button>';
+      openModal();
+
+      modalActions.querySelector('[data-hint]').addEventListener('click', () => {
+        feedback.textContent = 'Dica: substitua cada coordenada em L = 5x + 8y. Exemplo: em B(30,0), L = 5·30 + 8·0.';
+        feedback.className = 'feedback good';
+      });
+      modalActions.querySelector('[data-close]').addEventListener('click', closeModal);
+      modalActions.querySelector('[data-check]').addEventListener('click', () => checkCalculationAnswer(room));
+    }
+
+    function normalizeText(value) {
+      return String(value).trim().replace(',', '.').toUpperCase();
+    }
+
+    function checkCalculationAnswer(room) {
+      const results = room.fields.map(field => {
+        const raw = document.getElementById(`field-${field.id}`).value;
+        const normalized = normalizeText(raw);
+        if (typeof field.value === 'number') {
+          return Number(normalized) === field.value;
+        }
+        return normalized === field.value;
+      });
+
+      if (results.every(Boolean)) {
+        solveRoom(room);
+      } else {
+        game.score = Math.max(0, game.score - 15);
+        feedback.textContent = wrongFeedback.calculations;
+        feedback.className = 'feedback bad';
+        renderInventory();
+      }
+    }
+
+    function checkChoiceAnswer(room) {
+      if (game.selected === null) {
+        feedback.textContent = 'Escolha uma alternativa antes de verificar.';
+        feedback.className = 'feedback bad';
+        return;
+      }
+
+      if (game.selected === room.answer) {
+        solveRoom(room);
+      } else {
+        game.score = Math.max(0, game.score - 15);
+        feedback.textContent = room.options[game.selected].feedback || 'Ainda não. Releia o enunciado e tente novamente.';
+        feedback.className = 'feedback bad';
+        renderInventory();
+      }
+    }
+
+    function solveRoom(room) {
+      game.solved.add(room.id);
+      game.inventory.add(room.item);
+      game.score += 100;
+      feedback.textContent = room.success;
+      feedback.className = 'feedback good';
+      modalActions.innerHTML = '<button type="button" data-close>Continuar</button>';
+      modalActions.querySelector('[data-close]').addEventListener('click', closeModal);
+      const collected = items.find(item => item.id === room.item);
+      setMessage(`<b>Item coletado:</b> ${collected.icon} ${collected.name}.`);
+      appendRecord(room);
+      renderRoom();
+      renderInventory();
+    }
+
+    function appendRecord(room) {
+      const additions = {
+        board: 'Variáveis: x = quantidade de sanduíches; y = quantidade de sucos.\n',
+        locker: 'Restrição de recurso: 2x + y ≤ 60.\n',
+        cabinet: 'Função objetivo: maximizar L = 5x + 8y.\n',
+        graph: 'Estratégia: comparar os valores de L nos vértices da região viável.\n',
+        safe: 'Cálculos: A=0, B=150, C=260, D=320. Melhor solução: D(0,40), com lucro de R$ 320.\n'
+      };
+      studentRecord.value += additions[room.id] || '';
+    }
+
+    function showHint(room) {
+      const hints = {
+        board: 'Dica: procure a alternativa que descreve quantidades produzidas, não preço ou lucro total.',
+        locker: 'Dica: recurso limitado geralmente gera desigualdade com “menor ou igual”.',
+        cabinet: 'Dica: como queremos maior lucro, a palavra-chave é maximizar.',
+        graph: 'Dica: observe os pontos de canto da região sombreada.',
+        safe: 'Dica: substitua x e y em L = 5x + 8y para cada ponto.'
+      };
+      feedback.textContent = hints[room.id] || 'Use as informações já coletadas no inventário.';
+      feedback.className = 'feedback good';
+    }
+
+    function showInfo(room) {
+      modalTitle.textContent = `${room.icon} ${room.title}`;
+      modalBody.innerHTML = `<p>${room.description}</p><p>${room.info}</p>`;
+      feedback.textContent = '';
+      feedback.className = 'feedback';
+      modalActions.innerHTML = '<button type="button" data-close>Entendi</button>';
+      modalActions.querySelector('[data-close]').addEventListener('click', closeModal);
+      openModal();
+    }
+
+    function openFinalDoor() {
+      modalTitle.textContent = '🚪 Porta de Saída';
+
+      if (!game.inventory.has('chave')) {
+        modalBody.innerHTML = '<p>A porta está trancada. Encontre a Chave Final no Cofre da Otimização.</p>';
+        modalActions.innerHTML = '<button type="button" data-close>Voltar</button>';
+      } else {
+        game.score += game.solved.has('door') ? 0 : 250;
+        game.solved.add('door');
+        modalBody.innerHTML = `
+          <div class="certificate">
+            <h3>🎉 Escape concluído!</h3>
+            <p>A turma resolveu o problema da cantina usando programação linear.</p>
+            <p><strong>Pontuação final:</strong> ${game.score} pontos</p>
+            <p><strong>Solução ótima:</strong> produzir 0 sanduíches e 40 sucos, obtendo lucro máximo de R$ 320 dentro dos vértices avaliados.</p>
+          </div>
+          <h3>🧠 Perguntas finais para o Google Sala de Aula</h3>
+          <ol class="reflection-list">
+            <li>Por que a solução ótima precisa respeitar todas as restrições?</li>
+            <li>Que mudança no problema poderia alterar o vértice ótimo?</li>
+            <li>Em uma situação real, seria razoável produzir somente sucos? Que outros critérios poderiam ser considerados?</li>
+          </ol>
+        `;
+        studentRecord.value += 'Conclusão: a melhor solução entre os vértices testados é D(0,40), com L = 320. A decisão é ótima matematicamente, mas pode ser discutida do ponto de vista comercial.\n';
+        setMessage('<b>Parabéns!</b> A turma escapou. Agora justifiquem a solução e discutam se ela também faz sentido no mundo real.');
+        modalActions.innerHTML = '<button type="button" data-close>Comemorar</button><button class="secondary" type="button" data-copy>Copiar registro</button><button class="secondary" type="button" data-reset>Jogar de novo</button>';
+        renderRoom();
+        renderInventory();
+      }
+
+      feedback.textContent = '';
+      feedback.className = 'feedback';
+      modalActions.querySelector('[data-close]').addEventListener('click', closeModal);
+      const reset = modalActions.querySelector('[data-reset]');
+      const copy = modalActions.querySelector('[data-copy]');
+      if (reset) reset.addEventListener('click', resetGame);
+      if (copy) copy.addEventListener('click', copyRecord);
+      openModal();
+    }
+
+    function copyRecord() {
+      navigator.clipboard.writeText(studentRecord.value).then(() => {
+        feedback.textContent = 'Registro copiado. Agora ele pode ser colado no Google Sala de Aula.';
+        feedback.className = 'feedback good';
+      }).catch(() => {
+        feedback.textContent = 'Não foi possível copiar automaticamente. Selecione o texto no painel e copie manualmente.';
+        feedback.className = 'feedback bad';
+      });
+    }
+
+    function openModal() {
+      modal.classList.add('open');
+      const firstButton = modal.querySelector('button');
+      if (firstButton) firstButton.focus();
+    }
+
+    function closeModal() { modal.classList.remove('open'); }
+
+    function resetGame() {
+      game.score = 0;
+      game.selected = null;
+      game.solved.clear();
+      game.inventory.clear();
+      studentRecord.value = '';
+      closeModal();
+      setMessage('<b>Missão reiniciada:</b> explore a sala e colete os itens matemáticos.');
+      renderRoom();
+      renderInventory();
+    }
+
+    document.getElementById('resetButton').addEventListener('click', resetGame);
+    document.getElementById('startButton').addEventListener('click', () => {
+      document.getElementById('gameArea').scrollIntoView({ behavior: 'smooth' });
+      setMessage('<b>Missão iniciada:</b> comece pelo Quadro da Cantina.');
+    });
+    document.getElementById('contrastButton').addEventListener('click', () => {
+      document.body.classList.toggle('high-contrast');
+    });
+
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closeModal();
+    });
+
+    renderRoom();
+    renderInventory();
+  </script>
+</body>
+</html>
